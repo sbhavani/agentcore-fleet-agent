@@ -1,0 +1,111 @@
+[
+  {
+    "name": "get_driver_profile",
+    "description": "Look up a commercial driver's compliance record: CDL status and expiry, medical certificate, drug/alcohol test status, hours-of-service (HOS) violations, and vehicle inspection result. Use this to show the underlying evidence when a user asks for details about a driver.",
+    "inputSchema": {
+      "type": "object",
+      "description": "Driver lookup",
+      "properties": {
+        "driver_id": {
+          "type": "string",
+          "description": "Driver identifier, e.g. driver-47"
+        }
+      },
+      "required": ["driver_id"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "description": "Driver compliance record",
+      "properties": {
+        "found": { "type": "boolean" },
+        "driver_id": { "type": "string" },
+        "name": { "type": "string" },
+        "cdl_status": { "type": "string" },
+        "cdl_expires": { "type": "string" },
+        "medical_cert_expires": { "type": "string" },
+        "drug_test_status": { "type": "string" },
+        "hos_violation": { "type": "boolean" },
+        "vehicle_inspection": { "type": "string" },
+        "known_driver_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Populated only when the driver was not found"
+        }
+      },
+      "required": ["found", "driver_id"]
+    }
+  },
+  {
+    "name": "evaluate_driver_fitness",
+    "description": "Deterministic DOT compliance rules engine. ALWAYS use this tool to decide whether a driver is fit to drive — never decide fitness yourself. Evaluates CDL validity/expiry, medical certificate, drug/alcohol testing, HOS violations, and vehicle inspection. Returns status FIT, NEEDS_REVIEW, or UNFIT_TO_DRIVE with the specific violations and review reasons.",
+    "inputSchema": {
+      "type": "object",
+      "description": "Fitness evaluation request",
+      "properties": {
+        "driver_id": {
+          "type": "string",
+          "description": "Driver identifier, e.g. driver-47"
+        }
+      },
+      "required": ["driver_id"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "description": "Deterministic fitness evaluation result",
+      "properties": {
+        "driver_id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": {
+          "type": "string",
+          "description": "FIT, NEEDS_REVIEW, or UNFIT_TO_DRIVE"
+        },
+        "violations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Hard DOT violations that make the driver unfit"
+        },
+        "review_reasons": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Missing or unclear records requiring human review"
+        },
+        "evaluated_on": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["driver_id", "status", "violations", "review_reasons"]
+    }
+  },
+  {
+    "name": "notify_fleet_owner",
+    "description": "Send a compliance alert to the fleet owner and safety manager. Only call this tool when evaluate_driver_fitness returned UNFIT_TO_DRIVE or NEEDS_REVIEW. Include the driver id, status, and specific violations or review reasons in the message.",
+    "inputSchema": {
+      "type": "object",
+      "description": "Notification request",
+      "properties": {
+        "driver_id": {
+          "type": "string",
+          "description": "Driver the alert concerns"
+        },
+        "message": {
+          "type": "string",
+          "description": "Alert text with driver id, status, and reasons"
+        }
+      },
+      "required": ["driver_id", "message"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "description": "Notification delivery result",
+      "properties": {
+        "notification_id": { "type": "string" },
+        "driver_id": { "type": "string" },
+        "channel": { "type": "string" },
+        "delivered_to": { "type": "string" },
+        "cc": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["notification_id", "status"]
+    }
+  }
+]

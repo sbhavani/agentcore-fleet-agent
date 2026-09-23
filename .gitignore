@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local env / secrets — never commit real credentials
+.env
+.env.*
+
+# AgentCore CLI local state
+.agentcore/
+node_modules/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Build artifacts
+*.zip
+dist/
+build/
