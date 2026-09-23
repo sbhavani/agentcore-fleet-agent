@@ -196,6 +196,53 @@ python ../scripts/invoke_harness.py "Is driver-88 fit to drive?"
    `approve_sidelining`) that pauses the harness and returns the call to your
    code — the documented pattern for approvals.
 
+## What I learned building this
+
+Notes for anyone coming from core AWS services, written mid-journey:
+
+1. **The interesting part isn't the model call, it's the loop.** Lambda runs
+   code you wrote; a harness runs a loop where the model picks the next step
+   at runtime. Once I internalized that, every AgentCore service snapped into
+   place as "plumbing for a non-deterministic control flow."
+
+2. **One Lambda can host many tools — but you must strip the prefix.** The
+   gateway names tools `<target>___<tool>` (three underscores). If your
+   dispatch table keys on the unprefixed name, compare against the full
+   string and nothing matches. The fix is one line:
+   `name.rsplit("___", 1)[-1]` — easy to skim past in the docs.
+
+3. **Prompts are suggestions; Policy is enforcement.** Telling the agent
+   "never call notify unless the status is UNFIT" works until it doesn't.
+   The correct pattern is a deterministic rules engine owning the decision
+   (my `evaluate_driver_fitness` Lambda) plus AgentCore Policy evaluated
+   before every tool call. I'm doing the first half here; the second half is
+   next-modification #3.
+
+4. **Tool definitions cost tokens even when unused.** The default `shell` and
+   `file_operations` tools add ~900 input tokens *per model request*, and an
+   invocation can make several requests. `allowedTools` scoping isn't
+   premature optimization — it's the default hygiene.
+
+5. **Defaults at creation, overrides per invocation.** You can test N
+   model/prompt/tool combinations against the same deployed harness without
+   redeploying — a genuinely different operational model from Lambda versions
+   and aliases, and the fastest way to build intuition.
+
+6. **Sessions are environments, not chat history.** Each harness session runs
+   in an isolated microVM with its own filesystem, and state survives across
+   invocations via the session ID (which must be ≥33 chars — a UUID works).
+   "Continue the conversation" means "return to the same environment."
+
+7. **`agentcore deploy` is CDK in a trench coat.** The CLI synthesizes and
+   deploys a real stack — gateway, targets, roles, harness. You're not
+   clicking around a console; you're getting infrastructure-as-code behavior
+   for free.
+
+8. **Harness vs Runtime is Lambda vs Fargate.** Harness = declare model +
+   prompt + tools, no orchestration code. Runtime = bring your own framework
+   and container. Start with Harness; export to Strands code when config
+   stops being enough.
+
 ## Cleanup
 
 ```bash
