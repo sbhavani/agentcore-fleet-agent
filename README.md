@@ -1,25 +1,50 @@
-# Fleet Compliance "Hello Agent" on Amazon Bedrock AgentCore
+# AgentCore Hello Agent — learning Amazon Bedrock AgentCore
 
-A minimal, deployable first AgentCore project, based on the commercial-fleet
-compliance scenario: agents check driver DOT compliance, alert fleet owners,
-and drive remediation.
+A learn-in-public project for [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html).
+If you already know EC2, S3, Lambda, Fargate, and DynamoDB but haven't used
+AgentCore, this repo is a hands-on first contact: one small agent, three tools,
+one deploy command.
 
-The design rule baked into this demo: **the LLM never decides fitness.** A
-deterministic rules engine (a plain Lambda) owns that decision; the agent
-orchestrates evidence lookup, evaluation, and notification around it.
+The sample tools use a small **fictional dataset** (driver compliance records)
+purely as demo data. The point of the repo is the AWS plumbing — how a managed
+agent loop reaches your existing Lambda functions — not the domain.
+
+## The mental model in one line
+
+**Lambda runs functions you wrote; an AgentCore Harness runs an agent whose
+control flow the model decides at runtime. Gateway is how that agent reaches
+your existing AWS services.**
+
+## What you'll learn
+
+| AgentCore concept | If you know… | Where it shows up here |
+|---|---|---|
+| Harness | Lambda, but config-only | `agentcore add harness` — model + prompt + tools, no orchestration code |
+| Gateway | API Gateway for AI tools | Fronts one Lambda as three MCP tools |
+| Lambda target | Plain Lambda | `lambdas/driver_tools/` — three tools in one function |
+| Tool schema | API Gateway request models | `gateway/tools.json` |
+| Session | — | Reusing a `--session-id` continues the same conversation |
+| Observability | CloudWatch + X-Ray | Traces every model call and tool call automatically |
+
+## Architecture
 
 ```text
-you -> AgentCore Harness (the agent loop)
+you -> AgentCore Harness (the managed agent loop)
         |
         +-- AgentCore Gateway  (MCP tool surface, auth, audit)
         |      |
         |      +-- Lambda: fleet-driver-tools
-        |             - get_driver_profile       (mock DynamoDB lookup)
-        |             - evaluate_driver_fitness  (deterministic DOT rules)
-        |             - notify_fleet_owner       (mock SNS/SES)
+        |             - get_driver_profile       (mock data lookup)
+        |             - evaluate_driver_fitness  (deterministic rules engine)
+        |             - notify_fleet_owner       (mock notification)
         |
         +-- Model: Claude Sonnet 4.6 on Bedrock (default)
 ```
+
+One design rule baked into the demo: **the LLM never owns the decision.** A
+deterministic Lambda rules engine evaluates the records; the agent only
+orchestrates lookup → evaluation → notification. That separation is the
+difference between a demo and something you'd put near production.
 
 ## Layout
 
@@ -127,7 +152,8 @@ Session IDs must be at least 33 characters; reuse one to continue the same
 conversation. Other useful flags: `--logs` (non-interactive, logs to stdout),
 `--no-browser`, `--verbose` (raw streaming JSON events).
 
-Try all four demo drivers — each exercises a different branch of the rules engine:
+Try all four sample records — each exercises a different branch of the rules
+engine, so the agent picks a different tool sequence for each:
 
 | Prompt | Expected tool path | Expected status |
 |---|---|---|
@@ -147,8 +173,8 @@ python ../scripts/invoke_harness.py "Is driver-88 fit to drive?"
 ## What to look at while it runs
 
 - **The tool loop**: watch the harness call `evaluate_driver_fitness`, then
-  `notify_fleet_owner` — that's the model choosing sequence at runtime, which
-  is exactly what distinguishes an agent from a Lambda function.
+  `notify_fleet_owner` — that's the model choosing the sequence at runtime,
+  which is exactly what distinguishes an agent from a Lambda function.
 - **Traces**: every model call, tool call, and result is captured in AgentCore
   Observability (OpenTelemetry-based, surfaced through CloudWatch).
 - **Tool naming**: the gateway prefixes tools as `<target>___<tool>`, e.g.
@@ -191,7 +217,8 @@ aws lambda delete-function --function-name fleet-driver-tools
 
 ## Key docs
 
-- Harness get started: model default, CLI, session rules
-- Harness tools: tool types (`agentcore_gateway`, `inline_function`, …)
-- Gateway quick start: `agentcore add gateway` / `add gateway-target`
-- Lambda targets: tool schema and Lambda input/context format
+- [Harness get started](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-get-started.html) — model default, CLI, session rules
+- [Harness tools](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-tools.html) — tool types (`agentcore_gateway`, `inline_function`, …)
+- [Gateway quick start](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-quick-start.html) — `agentcore add gateway` / `add gateway-target`
+- [Lambda targets](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-add-target-lambda.html) — tool schema and Lambda input/context format
+- [What is AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html) — all core services
